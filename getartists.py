@@ -3,6 +3,7 @@ When run, this script will get all of the related artists (starting with Band Of
 that Spotify has with a popularity rating over 20.
 Puts data into a currently hardcoded, local neo4j graph database with their relationships
 """
+import sys
 import config
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -78,5 +79,9 @@ def get_related_artists(artist_id):
             SESSION.run("MATCH (a:Artist),(b:Artist) WHERE a.id = '" + artist.artist_id + "' AND b.id = '" + related_artist_id + "' CREATE (a) -[:relates_to]-> (b)")
         i = i + 1
 
-get_related_artists('0OdUWJ0sBjDrqHygGUXeCF')
-print("complete")
+#0OdUWJ0sBjDrqHygGUXeCF - Band Of Horses
+if len(sys.argv) < 2:
+    print("Must pass in an artist id")
+else:
+    get_related_artists(sys.argv[1])
+    print("complete")
