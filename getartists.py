@@ -5,6 +5,7 @@ Puts data into a currently hardcoded, local neo4j graph database with their rela
 """
 import sys
 import config
+import time
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 from neo4j.v1 import GraphDatabase, basic_auth
@@ -61,14 +62,18 @@ def get_related_artists(artist_id):
     first_artist = Artist(first_artist_json['id'], first_artist_json['name'])
     SESSION.run("MERGE (a:Artist {name: {name}, id: {id}})", {"name": first_artist.name, "id": first_artist.artist_id})
     ARTISTS.add(first_artist)
-    i = 0
-    while 1:
-        if i == len(ARTISTS):
-            return
+
+    while ARTISTS:
         artist = ARTISTS.pop()
-        print(artist.name + ' - ' + artist.artist_id)
-        
+        print("\n" + artist.name + " - " + artist.artist_id)
+        start = time.clock()
         results = SPOTIFY.artist_related_artists(artist.artist_id)
+        end = time.clock()
+        total = (end - start) * 1000
+        print("\nSpotify API call:")
+        print(total)
+        print("Adding to db:")
+        start = time.clock()
         for related_artist in results['artists']:
             related_artist_id = related_artist['id']
             related_artist_name = related_artist['name']
@@ -77,7 +82,9 @@ def get_related_artists(artist_id):
 
             SESSION.run("MERGE (a:Artist {name: {name}, id: {id}})", {"name": related_artist_name, "id": related_artist_id})
             SESSION.run("MATCH (a:Artist),(b:Artist) WHERE a.id = '" + artist.artist_id + "' AND b.id = '" + related_artist_id + "' CREATE (a) -[:relates_to]-> (b)")
-        i = i + 1
+        end = time.clock()
+        total = (end - start) * 1000
+        print(total)
 
 #0OdUWJ0sBjDrqHygGUXeCF - Band Of Horses
 if len(sys.argv) < 2:
