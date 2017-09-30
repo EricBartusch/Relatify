@@ -1,2 +1,5 @@
 Queries.txt
 config.py
+createtimingstable.py
+selectalltimings.py
+timings.db

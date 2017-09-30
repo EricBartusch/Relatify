@@ -4,8 +4,9 @@ that Spotify has with a popularity rating over 20.
 Puts data into a currently hardcoded, local neo4j graph database with their relationships
 """
 import sys
-import config
 import time
+import sqlite3
+import config
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 from neo4j.v1 import GraphDatabase, basic_auth
@@ -13,6 +14,12 @@ CLIENT_CREDENTIALS_MANAGER = SpotifyClientCredentials(config.client, config.secr
 SPOTIFY = spotipy.Spotify(client_credentials_manager=CLIENT_CREDENTIALS_MANAGER)
 ARTISTS_ARRAY = []
 ARTISTS = set()
+ARTISTS_HISTORY = set()
+
+CONN = sqlite3.connect('timings.db')
+CURSOR = CONN.cursor()
+CURSOR.execute("DELETE FROM timings")
+
 DRIVER = GraphDatabase.driver("bolt://localhost:7687", auth=basic_auth("neo4j", config.password))
 SESSION = DRIVER.session()
 SESSION.run("MATCH (n) DETACH DELETE n")
@@ -62,6 +69,8 @@ def get_related_artists(artist_id):
     first_artist = Artist(first_artist_json['id'], first_artist_json['name'])
     SESSION.run("MERGE (a:Artist {name: {name}, id: {id}})", {"name": first_artist.name, "id": first_artist.artist_id})
     ARTISTS.add(first_artist)
+    ARTISTS_HISTORY.add(first_artist)
+    i = 1
 
     while ARTISTS:
         artist = ARTISTS.pop()
@@ -69,22 +78,29 @@ def get_related_artists(artist_id):
         start = time.clock()
         results = SPOTIFY.artist_related_artists(artist.artist_id)
         end = time.clock()
-        total = (end - start) * 1000
+        spotify_time = (end - start) * 1000
         print("\nSpotify API call:")
-        print(total)
+        print(spotify_time)
         print("Adding to db:")
         start = time.clock()
         for related_artist in results['artists']:
             related_artist_id = related_artist['id']
             related_artist_name = related_artist['name']
             if related_artist['popularity'] > 20:
-                ARTISTS.add(Artist(related_artist_id, related_artist_name))
+                before_len = len(ARTISTS_HISTORY)
+                ARTISTS_HISTORY.add(Artist(related_artist_id, related_artist_name))
+                #If we haven't added this artist before...
+                if(len(ARTISTS_HISTORY) > before_len):
+                    ARTISTS.add(Artist(related_artist_id, related_artist_name))
 
             SESSION.run("MERGE (a:Artist {name: {name}, id: {id}})", {"name": related_artist_name, "id": related_artist_id})
             SESSION.run("MATCH (a:Artist),(b:Artist) WHERE a.id = '" + artist.artist_id + "' AND b.id = '" + related_artist_id + "' CREATE (a) -[:relates_to]-> (b)")
         end = time.clock()
-        total = (end - start) * 1000
-        print(total)
+        neo4j_time = (end - start) * 1000
+        print(neo4j_time)
+        CONN.execute("INSERT INTO timings VALUES(" + str(i) + ", " + str(spotify_time) + ", " + str(neo4j_time) + ")")
+        CONN.commit()
+        i = i + 1
 
 #0OdUWJ0sBjDrqHygGUXeCF - Band Of Horses
 if len(sys.argv) < 2:
