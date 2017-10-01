@@ -19,6 +19,8 @@ ARTISTS_HISTORY = set()
 CONN = sqlite3.connect('timings.db')
 CURSOR = CONN.cursor()
 CURSOR.execute("DELETE FROM timings")
+CURSOR.execute("DELETE FROM neo4jtimings")
+CONN.commit()
 
 DRIVER = GraphDatabase.driver("bolt://localhost:7687", auth=basic_auth("neo4j", config.password))
 SESSION = DRIVER.session()
@@ -93,12 +95,20 @@ def get_related_artists(artist_id):
                 if(len(ARTISTS_HISTORY) > before_len):
                     ARTISTS.add(Artist(related_artist_id, related_artist_name))
 
+            node_start = time.clock()
             SESSION.run("MERGE (a:Artist {name: {name}, id: {id}})", {"name": related_artist_name, "id": related_artist_id})
+            node_end = time.clock()
+            relationship_start = time.clock()
             SESSION.run("MATCH (a:Artist),(b:Artist) WHERE a.id = '" + artist.artist_id + "' AND b.id = '" + related_artist_id + "' CREATE (a) -[:relates_to]-> (b)")
+            relationship_end = time.clock()
+            node_create_time = (node_end - node_start) * 1000
+            relationship_create_time = (relationship_end - relationship_start) * 1000
+            CONN.execute("INSERT INTO neo4jtimings VALUES (?,?,?,?);", (str(i), str(node_create_time), str(relationship_create_time), str(related_artist_id)))
+
         end = time.clock()
         neo4j_time = (end - start) * 1000
         print(neo4j_time)
-        CONN.execute("INSERT INTO timings VALUES(" + str(i) + ", " + str(spotify_time) + ", " + str(neo4j_time) + ")")
+        CONN.execute("INSERT INTO timings VALUES(?,?,?,?);", (str(i), str(artist.artist_id), str(spotify_time), str(neo4j_time)))
         CONN.commit()
         i = i + 1
 
