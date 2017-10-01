@@ -99,7 +99,7 @@ def get_related_artists(artist_id):
             SESSION.run("MERGE (a:Artist {name: {name}, id: {id}})", {"name": related_artist_name, "id": related_artist_id})
             node_end = time.clock()
             relationship_start = time.clock()
-            SESSION.run("MATCH (a:Artist),(b:Artist) WHERE a.id = '" + artist.artist_id + "' AND b.id = '" + related_artist_id + "' CREATE (a) -[:relates_to]-> (b)")
+            SESSION.run("MATCH (a {id: '" + artist.artist_id + "' }),(a {id: '" + related_artist_id + "' }) CREATE (a) -[:relates_to]-> (b)")
             relationship_end = time.clock()
             node_create_time = (node_end - node_start) * 1000
             relationship_create_time = (relationship_end - relationship_start) * 1000

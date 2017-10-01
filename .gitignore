@@ -3,3 +3,4 @@ config.py
 createtimingstable.py
 selectalltimings.py
 timings.db
+data/
